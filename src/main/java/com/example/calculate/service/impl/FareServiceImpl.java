@@ -14,54 +14,91 @@ import com.example.calculate.service.FareService;
 @Service
 public class FareServiceImpl implements FareService {
 
-	public FareResponse calculateFare(FareRequest req) {
-		double distanceCharge = req.getDistance() * 1.5;
-		double durationCharge = req.getDuration() * 0.34;
-		double baseFare = distanceCharge + durationCharge;
-		double finalFare = baseFare;
+    public FareResponse calculateFare(FareRequest req) {
+        double distanceCharge = req.getDistance() * 1.5;
+        double durationCharge = req.getDuration() * 0.34;
+        double baseFare = distanceCharge + durationCharge;
+        double finalFare = baseFare;
 
-		List<Map<String, Object>> appliedFactors = new ArrayList<>();
-		Map<String, Double> breakdown = new HashMap<>();
-		breakdown.put("distanceCharge", distanceCharge);
-		breakdown.put("durationCharge", durationCharge);
+        List<Map<String, Object>> appliedFactors = new ArrayList<>();
+        Map<String, Double> breakdown = new HashMap<>();
+        breakdown.put("distanceCharge", distanceCharge);
+        breakdown.put("durationCharge", durationCharge);
 
-		double surgeMultiplier = switch (req.getTimeOfDay()) {
-		case PEAK_HOURS -> 1.5;
-		case NIGHT -> 2.0;
-		case STANDARD -> 1.0;
-		};
+        double surgeMultiplier = 1.0;
+        switch (req.getTimeOfDay()) {
+            case PEAK_HOURS:
+                surgeMultiplier = 1.5;
+                break;
+            case NIGHT:
+                surgeMultiplier = 2.0;
+                break;
+            case STANDARD:
+                surgeMultiplier = 1.0;
+                break;
+        }
 
-		double surgeAmount = baseFare * (surgeMultiplier - 1);
-		finalFare *= surgeMultiplier;
-		appliedFactors.add(Map.of("type", "TIME_SURGE", "multiplier", surgeMultiplier));
-		breakdown.put("surgeAmount", surgeAmount);
+        double surgeAmount = baseFare * (surgeMultiplier - 1);
+        finalFare *= surgeMultiplier;
 
-		double vehicleMultiplier = switch (req.getVehicleType()) {
-		case PREMIUM -> 1.2;
-		case LUXURY -> 1.5;
-		case STANDARD -> 1.0;
-		};
-		finalFare *= vehicleMultiplier;
-		appliedFactors.add(Map.of("type", "VEHICLE_TYPE", "multiplier", vehicleMultiplier));
+        Map<String, Object> timeSurgeFactor = new HashMap<>();
+        timeSurgeFactor.put("type", "TIME_SURGE");
+        timeSurgeFactor.put("multiplier", surgeMultiplier);
+        appliedFactors.add(timeSurgeFactor);
 
-		double discountPercent = switch (req.getPassengerLoyaltyTier()) {
-		case SILVER -> 5;
-		case GOLD -> 10;
-		case PLATINUM -> 15;
-		case BRONZE -> 0;
-		};
-		double discountAmount = finalFare * (discountPercent / 100);
-		finalFare -= discountAmount;
-		appliedFactors.add(Map.of("type", "LOYALTY_DISCOUNT", "percentage", discountPercent));
-		breakdown.put("loyaltyDiscount", discountAmount);
+        breakdown.put("surgeAmount", surgeAmount);
 
-		FareResponse res = new FareResponse();
-		res.setRideId(req.getRideId());
-		res.setBaseFare(baseFare);
-		res.setFinalFare(finalFare);
-		res.setAppliedFactors(appliedFactors);
-		res.setBreakdown(breakdown);
+        double vehicleMultiplier = 1.0;
+        switch (req.getVehicleType()) {
+            case PREMIUM:
+                vehicleMultiplier = 1.2;
+                break;
+            case LUXURY:
+                vehicleMultiplier = 1.5;
+                break;
+            case STANDARD:
+                vehicleMultiplier = 1.0;
+                break;
+        }
+        finalFare *= vehicleMultiplier;
 
-		return res;
-	}
+        Map<String, Object> vehicleFactor = new HashMap<>();
+        vehicleFactor.put("type", "VEHICLE_TYPE");
+        vehicleFactor.put("multiplier", vehicleMultiplier);
+        appliedFactors.add(vehicleFactor);
+
+        double discountPercent = 0;
+        switch (req.getPassengerLoyaltyTier()) {
+            case SILVER:
+                discountPercent = 5;
+                break;
+            case GOLD:
+                discountPercent = 10;
+                break;
+            case PLATINUM:
+                discountPercent = 15;
+                break;
+            case BRONZE:
+                discountPercent = 0;
+                break;
+        }
+        double discountAmount = finalFare * (discountPercent / 100);
+        finalFare -= discountAmount;
+
+        Map<String, Object> loyaltyFactor = new HashMap<>();
+        loyaltyFactor.put("type", "LOYALTY_DISCOUNT");
+        loyaltyFactor.put("percentage", discountPercent);
+        appliedFactors.add(loyaltyFactor);
+
+        breakdown.put("loyaltyDiscount", discountAmount);
+
+        FareResponse res = new FareResponse();
+        res.setRideId(req.getRideId());
+        res.setBaseFare(baseFare);
+        res.setFinalFare(finalFare);
+        res.setAppliedFactors(appliedFactors);
+        res.setBreakdown(breakdown);
+
+        return res;
+    }
 }
