@@ -1,0 +1,4 @@
+port: 8025
+
+api:
+  url: http://192.168.151.122:8262/rest/smpp/submitSM
